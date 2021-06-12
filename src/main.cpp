@@ -16,7 +16,7 @@ using nlohmann::json;
 using std::string;
 using std::vector;
 
-
+// A class to store the relevant parameters for the vehicles around us 
 class Vehicle {
 public:
     int id;
@@ -47,6 +47,8 @@ public:
 
 };
 
+// A function that assigns cost based on the speed of the lane(fastest lane gets the slowest cost).
+// The speed of a lane is defined as the speed of the car with maximum speed in that lane given that, the car in question is less than 100m ahead of us and less than 20m behind us 
 double lane_speed_cost(int lane, vector<Vehicle>& vehicles, double s){
     double lane_speed = 50/2.24;
     double max_speed = lane_speed;
@@ -65,7 +67,8 @@ double lane_speed_cost(int lane, vector<Vehicle>& vehicles, double s){
     return max_speed - lane_speed;
 }
 
-
+// A function to check the safety of the lane change, given the destination lane and vehicles around us. 
+// Here it is assumed that the car in the destination lane has to have a distance of atleast 30m from the car
 bool lane_change_safe(int lane, std::vector<Vehicle>& vehicles, double s){
     for(Vehicle vehicle : vehicles){
         if(vehicle.lane == lane){
@@ -77,9 +80,9 @@ bool lane_change_safe(int lane, std::vector<Vehicle>& vehicles, double s){
     }
 
     return true;
-
 }
 
+// Initial parameter initialization
 int lane = 1;
 double ref_vel = 0.0;
 
@@ -119,10 +122,7 @@ int main() {
     map_waypoints_s.push_back(s);
     map_waypoints_dx.push_back(d_x);
     map_waypoints_dy.push_back(d_y);
-  }
-
-  // defining reference variables and values
-  
+  }  
   
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,
@@ -142,7 +142,6 @@ int main() {
         string event = j[0].get<string>();
         
         if (event == "telemetry") {
-          
           double MAX_ACC = 10;
           double MAX_JERK = 10;
           double MAX_VEL = 49.5;
@@ -215,7 +214,7 @@ int main() {
           bool too_close = false;
           // Only change lane if the car in front of us is at a unsafe distance(is only possible if it is too slow)
           for(Vehicle vehicle : vehicles){
-            if(vehicle.lane == current_lane){// || vehicle.lane == lane){// Add comment here
+            if(vehicle.lane == current_lane){// || vehicle.lane == lane){// Predict the location of car in the current lane in the future and check if we are getting too close, if we keep proceeding as we are. A car being too close is defined as 30m away from us or less.
               double check_speed = vehicle.speed;
               double check_car_s = vehicle.s;
               check_car_s += ((double) prev_size * 0.02 * check_speed);
@@ -242,10 +241,9 @@ int main() {
             }
 
             std::cout<< best_lane << std::endl;
-
-            if(lane == current_lane){
+            if(lane == current_lane){ // check if we are not in the middle of a lane change
               if (best_lane > lane){
-                if(lane_change_safe(lane+1, vehicles, current_car_s)){
+                if(lane_change_safe(lane+1, vehicles, current_car_s)){ // if lane change is safe, execite it
                   lane = lane + 1;
                 }
               }else if (best_lane < lane){
@@ -261,7 +259,7 @@ int main() {
             }
 
             
-          }else{
+          }else{ // if no lane change is needed, increase velocity in increments till we reach speed limit
             if(ref_vel < MAX_VEL){
               ref_vel += 0.224;
             }

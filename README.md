@@ -1,6 +1,123 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
+
+### Objective
+Navigate through a highway as fast as possible. While navigating, the car should drive atleast 4.32 miles without incident, drive according to the speed limit, acceleration should be less than 10m/s^2, jerk should be less than 10m/s^3, no collisions should occur and intelligent lane changes should be done to increase efficiency.
+
+### Overview of planner
+The planner can be assumed to be a finite state machine with 5 states. Keep Lane, Prepare Lane Change Left, Prepare Lane Change Right, Lane Change Left, Lane Change Right. Although the state machine is not explicitly coded but the code was writen keeping this in mind. The switching between these states is done based on Cost functions.
+
+### Cost Functions
+There are two cost functions in the project, One is the lane-speed-cost and the other is the lane-change-safety checker 
+
+#### Lane Speed Cost   
+```
+// A function that assigns cost based on the speed of the lane(fastest lane gets the slowest cost).
+// The speed of a lane is defined as the speed of the car with maximum speed in that lane given that, the car in question is less than 100m ahead of us and less than 20m behind us
+double lane_speed_cost(int lane, vector<Vehicle>& vehicles, double s){
+    double lane_speed = 50/2.24;
+    double max_speed = lane_speed;
+    for(Vehicle vehicle : vehicles){
+        if(vehicle.lane == lane){
+            double distance = vehicle.s - s;
+            if(distance < 100 && distance > -20){
+                if(vehicle.speed < lane_speed){
+                    lane_speed = vehicle.speed;
+                }
+            }
+
+        }
+    }
+
+    return max_speed - lane_speed;
+}
+```
+
+#### Lane Change Safety Cost
+```
+// A function to check the safety of the lane change, given the destination lane and vehicles around us.
+// Here it is assumed that the car in the destination lane has to have a distance of atleast 30m from the car
+bool lane_change_safe(int lane, std::vector<Vehicle>& vehicles, double s){
+    for(Vehicle vehicle : vehicles){
+        if(vehicle.lane == lane){
+            double distance = fabs(vehicle.s - s);
+            if(distance<30){
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+```
+
+### Planner Working
+####Initialize in Keep Lane state
+This is done in code via setting a particular lane value and not changing it. This is when the current_lane and lane are equal and the current lane has lowest speed cost.
+
+#### Check whether the car in front of us is going too slow
+This is done via predicting the future position of the car ahead using its current speed and compare it to out future waypoint. If the car is at a unsafe distance(assumed 30m or less here), then the car ahead is deemed to be running too slow, Now we assume that the car has moved to a prepare lane change state. If the car is at a safe distance, no change in state occurs.
+```
+bool too_close = false;
+// Only change lane if the car in front of us is at a unsafe distance(is only possible if it is too slow)
+for(Vehicle vehicle : vehicles){
+  if(vehicle.lane == current_lane){// Predict the location of car in the current lane in the future and check if we are getting too close, if we keep proceeding as we are. A car being too close is defined as 30m away from us or less.
+    double check_speed = vehicle.speed;
+    double check_car_s = vehicle.s;
+    check_car_s += ((double) prev_size * 0.02 * check_speed);
+    if ((check_car_s > car_s) && (check_car_s - car_s <30)){
+      if(vehicle.s > current_car_s)
+        too_close = true;
+    }
+  }
+}
+```
+
+#### Prepare Lane Change state
+Here both the costs are computed and it is determined if a lane change is needed and if it is safe or not. This is done cia the two functions listed in cost functions. If it is not safe or not needed as current lane is still faster then the other lanes, then we stay behind the car ahead until a lane change is safe and advantageous. If it is safe and advantageous. We switch to the lane change state. This is done by setting the lane value to a new value based on the destination lane. This state is when the current_lane and lane have different values and it is unsafe to change lanes.
+
+check if out lane is not the fastest using cost function
+```
+int best_lane = lane;
+double current_lane_cost = lane_speed_cost(lane, vehicles, current_car_s);
+for (int i=0; i<NUM_LANES; i++){
+  double cost = lane_speed_cost(i, vehicles, current_car_s);
+  std::cout<< "COST : " << cost<< std::endl;
+  if(cost<current_lane_cost){
+    best_lane = i;
+    current_lane_cost = cost;
+  }
+}
+```
+If it is not the fastest, check if it is safe to change lanes and if so assign new value to lane variable
+```
+if(lane == current_lane){ // check if we are not in the middle of a lane change
+  if (best_lane > lane){
+    if(lane_change_safe(lane+1, vehicles, current_car_s)){ // if lane change is safe, execite it
+      lane = lane + 1;
+    }
+  }else if (best_lane < lane){
+    if(lane_change_safe(lane-1, vehicles, current_car_s)){
+      lane = lane - 1;
+    }
+  }
+  // if out lane is fastest, decrease velocity
+  if(lane == current_lane){
+    if(ref_vel >0.224)
+      ref_vel -= 0.224;
+  }
+}
+```
+
+#### Lane change state
+Here the new trajectory is computed with the help of splines and when we are in the new lane and lane change is complete, the state is assumed to go back to Keep Lane State. This state is when the current_lane and lane have different values and it is deemed safe to change the lane. Splines help generate smooth trajectory based on a few future points in the map. This helps to avoid sudden corners and jerks in the path. As spline code examples and how to use them are there in the code walthrough of the course. I have ommited code examples here.
+
+I would like the add that the code contains just the if statements and no explicit state machine is being used. A particular configuration of parameter calues is treated as a state. But a state machine would be much more modular and cleaner if used and implemented. 
+
+### Future Improvements
+* Add a dedicated class for the Finite State Machine to make the code more readable.
+* There are some cases where two simultaneous lane changes are needed to achieve optimal result. My planner does not handle this correctly everytime and sometimes stays in the same lane as before.
+
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).  
 
