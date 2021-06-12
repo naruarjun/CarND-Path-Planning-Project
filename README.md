@@ -52,7 +52,7 @@ bool lane_change_safe(int lane, std::vector<Vehicle>& vehicles, double s){
 ```
 
 ### Planner Working
-####Initialize in Keep Lane state
+#### Initialize in Keep Lane state
 This is done in code via setting a particular lane value and not changing it. This is when the current_lane and lane are equal and the current lane has lowest speed cost.
 
 #### Check whether the car in front of us is going too slow
